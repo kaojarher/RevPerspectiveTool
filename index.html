@@ -88,6 +88,7 @@
                 max-width: none !important;
                 max-height: none !important;
                 box-shadow: none !important;
+                border-radius: 0 !important;
             }
         }
     </style>
@@ -158,16 +159,25 @@
                     <p class="mt-1 text-xs text-slate-400">建議使用具有單點透視感（如走廊、街道、房間）的方形照片</p>
                 </div>
 
-                <!-- 透視消失點微調 (中央小正方形在原圖的比例範圍) -->
+                <!-- 透視消失點微調：可拖曳/縮放的中央方框 -->
                 <div class="pt-2 border-t border-slate-100 space-y-3">
                     <div class="flex justify-between items-center">
-                        <label for="vanishing-ratio" class="text-xs font-medium text-slate-600">原圖中央遠景裁切比例 (消失點區域)</label>
+                        <label class="text-xs font-medium text-slate-600">中央遠景方框（消失點區域）</label>
+                        <button id="btn-reset-box" type="button" class="text-xs text-slate-500 hover:text-slate-800">重設方框</button>
+                    </div>
+                    <canvas id="source-editor-canvas" width="720" height="720" class="w-full aspect-square rounded-xl border border-slate-300 bg-slate-100 select-none" style="touch-action:none; cursor:crosshair;"></canvas>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        拖曳方框內部可移動位置；拖曳四個角落的圓點可調整範圍；點選方框外任一處可將方框移到該點。
+                    </p>
+                    <div class="flex justify-between items-center">
+                        <label for="vanishing-ratio" class="text-xs font-medium text-slate-600">方框大小</label>
                         <span id="vanishing-ratio-val" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">28%</span>
                     </div>
-                    <input type="range" id="vanishing-ratio" min="12" max="55" value="28" class="w-full">
-                    <p class="text-[11px] text-slate-400 leading-relaxed">
-                        調整原圖中央方塊所佔的範圍，使展開後的遠景（突出的小平面）與四周牆面/天花板/地板完美銜接。
-                    </p>
+                    <input type="range" id="vanishing-ratio" min="6" max="90" value="28" class="w-full">
+                    <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox" id="opt-lock-square" checked class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                        <span>鎖定為正方形（取消後可自由調整寬高）</span>
+                    </label>
                 </div>
             </section>
 
@@ -345,7 +355,9 @@
         // 全域狀態管理
         const state = {
             sourceImage: null,       // 載入的 HTMLImageElement 或 Canvas
-            vanishingRatio: 0.28,    // 原圖中央遠景方塊比例 (0.12 ~ 0.55)
+            vanishingRatio: 0.28,    // 原圖中央遠景方塊比例（與 box.w 同步）
+            box: { x: 0.36, y: 0.36, w: 0.28, h: 0.28 }, // 中央方框 (0~1 正規化座標，可拖曳/縮放)
+            lockSquare: true,        // 方框鎖定為正方形
             innerCm: 2.8,            // 截頭四角錐小底邊 (cm)
             outerCm: 13.8,           // 截頭四角錐大外框 (cm)
             slantCm: 7.5,            // 梯形斜面斜高 (cm) - 注意：幾何上斜高需 > (outer - inner)/2
@@ -544,7 +556,9 @@
         /**
          * 將任意上傳圖片裁切為置中正方形高解析度畫布 (1200x1200)
          */
+        const _squareCache = new WeakMap();
         function getSquareSourceCanvas(img) {
+            if (_squareCache.has(img)) return _squareCache.get(img);
             const targetSize = 1200;
             const canvas = document.createElement('canvas');
             canvas.width = targetSize;
@@ -558,6 +572,7 @@
             const sy = (sh - minSide) / 2;
 
             ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
+            _squareCache.set(img, canvas);
             return canvas;
         }
 
@@ -696,47 +711,62 @@
                 { x:  ha,     y:  ha }
             ];
 
-            // 計算左右兩側梯形上下斜邊的「虛線黏貼邊 (Glue Tabs)」(如參考圖 61108.jpg)
-            const buildGlueTab = (pInner, pOuter, outwardSignY) => {
-                // 沿著斜邊的單位向量與法向量
+            // 計算左右兩側梯形上下斜邊的「虛線黏貼邊 (Glue Tabs)」
+            // 黏貼邊只能存在於「左/右梯形」與「上/下梯形」之間的楔形空隙內，
+            // 因此沿法線方向求出到相鄰梯形邊線的實際可用寬度，並只取其 70%，確保不會越線。
+            const tabMeta = [];
+            const buildGlueTab = (pInner, pOuter, adjOuter, outwardSignY) => {
                 const dx = pOuter.x - pInner.x;
                 const dy = pOuter.y - pInner.y;
                 const edgeLen = Math.hypot(dx, dy);
                 const ux = dx / edgeLen;
                 const uy = dy / edgeLen;
-                // 指向外側的法向量
                 let nx = -uy;
                 let ny = ux;
-                if (ny * outwardSignY < 0) {
-                    nx = -nx;
-                    ny = -ny;
-                }
-                const tabWidth = Math.min(1.4, edgeLen * 0.22); // 黏貼邊寬度約 1.4cm
-                const inset = tabWidth * 0.85; // 梯形斜角內縮避免重疊干涉
+                if (ny * outwardSignY < 0) { nx = -nx; ny = -ny; }
 
+                // 相鄰梯形邊線：由 pInner 指向 adjOuter
+                const adx = adjOuter.x - pInner.x;
+                const ady = adjOuter.y - pInner.y;
+                const det = -nx * ady + adx * ny;
+
+                const widthAt = (s) => {
+                    const px = pInner.x + ux * edgeLen * s;
+                    const py = pInner.y + uy * edgeLen * s;
+                    const cx = pInner.x - px;
+                    const cy = pInner.y - py;
+                    if (Math.abs(det) < 1e-9) return 0;
+                    const t = (cx * (-ady) + adx * cy) / det;
+                    if (!(t > 0)) return 0;
+                    return Math.min(1.4, t * 0.7);
+                };
+
+                const s1 = 0.2, s2 = 0.92;
+                const w1 = widthAt(s1), w2 = widthAt(s2);
                 const t1 = {
-                    x: pInner.x + ux * inset + nx * tabWidth,
-                    y: pInner.y + uy * inset + ny * tabWidth
+                    x: pInner.x + ux * edgeLen * s1 + nx * w1,
+                    y: pInner.y + uy * edgeLen * s1 + ny * w1
                 };
                 const t2 = {
-                    x: pOuter.x - ux * inset + nx * tabWidth,
-                    y: pOuter.y - uy * inset + ny * tabWidth
+                    x: pInner.x + ux * edgeLen * s2 + nx * w2,
+                    y: pInner.y + uy * edgeLen * s2 + ny * w2
                 };
+                tabMeta.push({ s1, s2, w1, w2, edgeLen, sign: outwardSignY });
                 return [pInner, t1, t2, pOuter];
             };
 
             const tabs = [
-                buildGlueTab(left[1], left[0], -1),   // 左上黏貼邊
-                buildGlueTab(left[2], left[3],  1),   // 左下黏貼邊
-                buildGlueTab(right[0], right[1], -1), // 右上黏貼邊
-                buildGlueTab(right[3], right[2],  1)  // 右下黏貼邊
+                buildGlueTab(left[1],  left[0],  top[0],    -1), // 左上黏貼邊（相鄰：上梯形左斜邊）
+                buildGlueTab(left[2],  left[3],  bottom[3],  1), // 左下黏貼邊
+                buildGlueTab(right[0], right[1], top[1],    -1), // 右上黏貼邊
+                buildGlueTab(right[3], right[2], bottom[2],  1)  // 右下黏貼邊
             ];
 
             return {
                 a, b, L, height3D,
                 isClamped: state.slantCm < minSlant,
                 totalSpanCm: a + 2 * L,
-                center, top, bottom, left, right, tabs
+                center, top, bottom, left, right, tabs, tabMeta
             };
         }
 
@@ -749,13 +779,12 @@
             sourcePreviewCtx.clearRect(0, 0, w, h);
             sourcePreviewCtx.drawImage(srcCanvas, 0, 0, w, h);
 
-            const r = state.vanishingRatio;
-            const m = (1 - r) / 2;
-            const x0 = w * m, y0 = h * m, x1 = w * (1 - m), y1 = h * (1 - m);
+            const bx = state.box;
+            const x0 = w * bx.x, y0 = h * bx.y, x1 = w * (bx.x + bx.w), y1 = h * (bx.y + bx.h);
 
             sourcePreviewCtx.strokeStyle = '#3b82f6';
             sourcePreviewCtx.lineWidth = 1.5;
-            sourcePreviewCtx.strokeRect(x0, y0, w * r, h * r);
+            sourcePreviewCtx.strokeRect(x0, y0, x1 - x0, y1 - y0);
 
             sourcePreviewCtx.beginPath();
             sourcePreviewCtx.moveTo(0, 0); sourcePreviewCtx.lineTo(x0, y0);
@@ -810,32 +839,32 @@
             });
             const quadToPx = (quad) => quad.map(toPx);
 
-            // 定義來源圖片的 5 個分割區域 (單位：像素 0~1200)
+            // 定義來源圖片的 5 個分割區域 (單位：像素 0~1200)，中央方框可自由移動/縮放
             const S = srcCanvas.width;
-            const r = state.vanishingRatio;
-            const m = (1 - r) / 2;
-            const s0 = S * m;
-            const s1 = S * (1 - m);
+            const bxL = S * state.box.x;
+            const bxR = S * (state.box.x + state.box.w);
+            const byT = S * state.box.y;
+            const byB = S * (state.box.y + state.box.h);
 
             const srcCenter = [
-                { x: s0, y: s0 }, { x: s1, y: s0 },
-                { x: s1, y: s1 }, { x: s0, y: s1 }
+                { x: bxL, y: byT }, { x: bxR, y: byT },
+                { x: bxR, y: byB }, { x: bxL, y: byB }
             ];
             const srcTop = [
                 { x: 0,  y: 0 },  { x: S,  y: 0 },
-                { x: s1, y: s0 }, { x: s0, y: s0 }
+                { x: bxR, y: byT }, { x: bxL, y: byT }
             ];
             const srcBottom = [
-                { x: s0, y: s1 }, { x: s1, y: s1 },
+                { x: bxL, y: byB }, { x: bxR, y: byB },
                 { x: S,  y: S },  { x: 0,  y: S }
             ];
             const srcLeft = [
-                { x: 0,  y: 0 },  { x: s0, y: s0 },
-                { x: s0, y: s1 }, { x: 0,  y: S }
+                { x: 0,  y: 0 },  { x: bxL, y: byT },
+                { x: bxL, y: byB }, { x: 0,  y: S }
             ];
             const srcRight = [
-                { x: s1, y: s0 }, { x: S,  y: 0 },
-                { x: S,  y: S },  { x: s1, y: s1 }
+                { x: bxR, y: byT }, { x: S,  y: 0 },
+                { x: S,  y: S },  { x: bxR, y: byB }
             ];
 
             // 目標展開圖五個面的像素頂點
@@ -847,18 +876,25 @@
 
             // 1. 若開啟「黏貼邊延伸圖片出血」，先在黏貼邊繪製對應相鄰區域的延伸貼圖，避免折合接縫露白邊
             if (state.showTabs && state.bleedTabs) {
-                const tabSrcMappings = [
-                    // 左上黏貼邊：延伸上梯形左緣色調
-                    [{ x: s0, y: s0 }, { x: s0 * 0.85, y: s0 }, { x: 0, y: s0 * 0.15 }, { x: 0, y: 0 }],
-                    // 左下黏貼邊：延伸下梯形左緣色調
-                    [{ x: s0, y: s1 }, { x: s0 * 0.85, y: s1 }, { x: 0, y: S - s0 * 0.15 }, { x: 0, y: S }],
-                    // 右上黏貼邊：延伸上梯形右緣色調
-                    [{ x: s1, y: s0 }, { x: s1 + s0 * 0.15, y: s0 }, { x: S, y: s0 * 0.15 }, { x: S, y: 0 }],
-                    // 右下黏貼邊：延伸下梯形右緣色調
-                    [{ x: s1, y: s1 }, { x: s1 + s0 * 0.15, y: s1 }, { x: S, y: S - s0 * 0.15 }, { x: S, y: S }]
+                const clampS = (p) => ({ x: Math.max(0, Math.min(S, p.x)), y: Math.max(0, Math.min(S, p.y)) });
+                const tabSrcEdges = [
+                    [{ x: bxL, y: byT }, { x: 0, y: 0 }],   // 左上
+                    [{ x: bxL, y: byB }, { x: 0, y: S }],   // 左下
+                    [{ x: bxR, y: byT }, { x: S, y: 0 }],   // 右上
+                    [{ x: bxR, y: byB }, { x: S, y: S }]    // 右下
                 ];
                 geo.tabs.forEach((tabQuad, idx) => {
-                    drawTexturedQuad(ctx, srcCanvas, tabSrcMappings[idx], quadToPx(tabQuad), 8);
+                    const meta = geo.tabMeta[idx];
+                    const [pin, pout] = tabSrcEdges[idx];
+                    const dx = pout.x - pin.x, dy = pout.y - pin.y;
+                    const len = Math.hypot(dx, dy) || 1;
+                    const ux = dx / len, uy = dy / len;
+                    let nx = -uy, ny = ux;
+                    if (ny * meta.sign < 0) { nx = -nx; ny = -ny; }
+                    const k = len / meta.edgeLen; // 展開圖(cm) → 原圖(px) 比例
+                    const p1 = clampS({ x: pin.x + ux * len * meta.s1 + nx * meta.w1 * k, y: pin.y + uy * len * meta.s1 + ny * meta.w1 * k });
+                    const p2 = clampS({ x: pin.x + ux * len * meta.s2 + nx * meta.w2 * k, y: pin.y + uy * len * meta.s2 + ny * meta.w2 * k });
+                    drawTexturedQuad(ctx, srcCanvas, [pin, p1, p2, pout], quadToPx(tabQuad), 8);
                 });
             }
 
@@ -1069,9 +1105,10 @@
             const zBack = -geo.height3D / 2;   // 大外框底座 (-Z)
 
             // UV 分割座標 (對應原圖中央與四周)
-            const r = state.vanishingRatio;
-            const u0 = (1 - r) / 2;
-            const u1 = 1 - u0;
+            const uL = state.box.x;
+            const uR = state.box.x + state.box.w;
+            const vB = 1 - (state.box.y + state.box.h); // UV 的 V 軸向上
+            const vT = 1 - state.box.y;
 
             const positions = [];
             const uvs = [];
@@ -1097,15 +1134,15 @@
             const bBL = { x: -hb, y: -hb, z: zBack };
 
             // 1. 中央小底面 (前方平面)
-            addQuad(fTL, fBL, fBR, fTR, [u0, u1], [u0, u0], [u1, u0], [u1, u1]);
+            addQuad(fTL, fBL, fBR, fTR, [uL, vT], [uL, vB], [uR, vB], [uR, vT]);
             // 2. 上斜面 (天花板)
-            addQuad(bTL, fTL, fTR, bTR, [0, 1], [u0, u1], [u1, u1], [1, 1]);
+            addQuad(bTL, fTL, fTR, bTR, [0, 1], [uL, vT], [uR, vT], [1, 1]);
             // 3. 下斜面 (地板)
-            addQuad(fBL, bBL, bBR, fBR, [u0, u0], [0, 0], [1, 0], [u1, u0]);
+            addQuad(fBL, bBL, bBR, fBR, [uL, vB], [0, 0], [1, 0], [uR, vB]);
             // 4. 左斜面 (左牆)
-            addQuad(bTL, bBL, fBL, fTL, [0, 1], [0, 0], [u0, u0], [u0, u1]);
+            addQuad(bTL, bBL, fBL, fTL, [0, 1], [0, 0], [uL, vB], [uL, vT]);
             // 5. 右斜面 (右牆)
-            addQuad(fTR, fBR, bBR, bTR, [u1, u1], [u1, u0], [1, 0], [1, 1]);
+            addQuad(fTR, fBR, bBR, bTR, [uR, vT], [uR, vB], [1, 0], [1, 1]);
 
             const bufferGeo = new THREE.BufferGeometry();
             bufferGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -1172,7 +1209,177 @@
         function refreshAll() {
             renderPrintSheet(printCanvas, 300);
             updateThreeFrustumMesh();
+            renderSourceEditor();
+            syncBoxUI();
         }
+
+        /**
+         * 拖曳中的輕量重繪（低解析度），放開後再做完整重繪
+         */
+        function refreshLight() {
+            renderPrintSheet(printCanvas, 100);
+            renderSourceEditor();
+            syncBoxUI();
+        }
+
+        /**
+         * ==========================================
+         * 中央方框互動編輯器（拖曳移動 / 角落縮放）
+         * ==========================================
+         */
+        const editorCanvas = document.getElementById('source-editor-canvas');
+        const editorCtx = editorCanvas.getContext('2d');
+        const MIN_BOX = 0.06;
+        const HANDLE_R = 16; // 命中半徑 (canvas px)
+        let editorDrag = null;
+        let editorRaf = 0;
+
+        function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+        function syncBoxUI() {
+            state.vanishingRatio = state.box.w;
+            const pct = Math.round(state.box.w * 100);
+            document.getElementById('vanishing-ratio').value = clamp(pct, 6, 90);
+            document.getElementById('vanishing-ratio-val').textContent = `${pct}%`;
+        }
+
+        function renderSourceEditor() {
+            const W = editorCanvas.width, H = editorCanvas.height;
+            editorCtx.clearRect(0, 0, W, H);
+            if (!state.sourceImage) return;
+            editorCtx.drawImage(getSquareSourceCanvas(state.sourceImage), 0, 0, W, H);
+
+            const b = state.box;
+            const x0 = b.x * W, y0 = b.y * H, x1 = (b.x + b.w) * W, y1 = (b.y + b.h) * H;
+
+            // 方框外半透明遮罩
+            editorCtx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+            editorCtx.beginPath();
+            editorCtx.rect(0, 0, W, H);
+            editorCtx.rect(x0, y0, x1 - x0, y1 - y0);
+            editorCtx.fill('evenodd');
+
+            // 四條斜向分割線
+            editorCtx.strokeStyle = 'rgba(255,255,255,0.85)';
+            editorCtx.lineWidth = 2;
+            editorCtx.setLineDash([8, 6]);
+            editorCtx.beginPath();
+            editorCtx.moveTo(0, 0); editorCtx.lineTo(x0, y0);
+            editorCtx.moveTo(W, 0); editorCtx.lineTo(x1, y0);
+            editorCtx.moveTo(0, H); editorCtx.lineTo(x0, y1);
+            editorCtx.moveTo(W, H); editorCtx.lineTo(x1, y1);
+            editorCtx.stroke();
+            editorCtx.setLineDash([]);
+
+            // 方框
+            editorCtx.strokeStyle = '#3b82f6';
+            editorCtx.lineWidth = 3;
+            editorCtx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+
+            // 角落把手
+            [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(([hx, hy]) => {
+                editorCtx.beginPath();
+                editorCtx.arc(hx, hy, 9, 0, Math.PI * 2);
+                editorCtx.fillStyle = '#ffffff';
+                editorCtx.fill();
+                editorCtx.lineWidth = 3;
+                editorCtx.strokeStyle = '#2563eb';
+                editorCtx.stroke();
+            });
+        }
+
+        function editorPoint(e) {
+            const rect = editorCanvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) / rect.width,
+                y: (e.clientY - rect.top) / rect.height,
+                scale: editorCanvas.width / rect.width
+            };
+        }
+
+        function scheduleLightRefresh() {
+            if (editorRaf) return;
+            editorRaf = requestAnimationFrame(() => {
+                editorRaf = 0;
+                refreshLight();
+            });
+        }
+
+        function resizeBoxFromAnchor(ax, ay, px, py) {
+            const dx = px - ax, dy = py - ay;
+            const sx = dx >= 0 ? 1 : -1, sy = dy >= 0 ? 1 : -1;
+            const availX = sx > 0 ? 1 - ax : ax;
+            const availY = sy > 0 ? 1 - ay : ay;
+            let w, h;
+            if (state.lockSquare) {
+                const size = clamp(Math.max(Math.abs(dx), Math.abs(dy)), MIN_BOX, Math.min(availX, availY));
+                w = h = size;
+            } else {
+                w = clamp(Math.abs(dx), MIN_BOX, availX);
+                h = clamp(Math.abs(dy), MIN_BOX, availY);
+            }
+            state.box = { x: sx > 0 ? ax : ax - w, y: sy > 0 ? ay : ay - h, w, h };
+        }
+
+        editorCanvas.addEventListener('pointerdown', (e) => {
+            if (!state.sourceImage) return;
+            e.preventDefault();
+            editorCanvas.setPointerCapture(e.pointerId);
+            const p = editorPoint(e);
+            const b = state.box;
+            const hitR = (HANDLE_R * p.scale) / editorCanvas.width;
+            const corners = [
+                { cx: b.x,       cy: b.y,       ax: b.x + b.w, ay: b.y + b.h },
+                { cx: b.x + b.w, cy: b.y,       ax: b.x,       ay: b.y + b.h },
+                { cx: b.x + b.w, cy: b.y + b.h, ax: b.x,       ay: b.y },
+                { cx: b.x,       cy: b.y + b.h, ax: b.x + b.w, ay: b.y }
+            ];
+            const hit = corners.find(c => Math.hypot(p.x - c.cx, p.y - c.cy) <= hitR);
+            if (hit) {
+                editorDrag = { mode: 'resize', ax: hit.ax, ay: hit.ay };
+            } else {
+                const inside = p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+                if (!inside) {
+                    state.box.x = clamp(p.x - b.w / 2, 0, 1 - b.w);
+                    state.box.y = clamp(p.y - b.h / 2, 0, 1 - b.h);
+                    scheduleLightRefresh();
+                }
+                editorDrag = { mode: 'move', ox: p.x - state.box.x, oy: p.y - state.box.y };
+            }
+        });
+
+        editorCanvas.addEventListener('pointermove', (e) => {
+            const p = editorPoint(e);
+            if (!editorDrag) {
+                // 游標樣式提示
+                const b = state.box;
+                const hitR = (HANDLE_R * p.scale) / editorCanvas.width;
+                const onCorner = [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]]
+                    .some(([cx, cy]) => Math.hypot(p.x - cx, p.y - cy) <= hitR);
+                const inside = p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+                editorCanvas.style.cursor = onCorner ? 'nwse-resize' : (inside ? 'move' : 'crosshair');
+                return;
+            }
+            if (editorDrag.mode === 'move') {
+                state.box.x = clamp(p.x - editorDrag.ox, 0, 1 - state.box.w);
+                state.box.y = clamp(p.y - editorDrag.oy, 0, 1 - state.box.h);
+            } else {
+                resizeBoxFromAnchor(editorDrag.ax, editorDrag.ay, clamp(p.x, 0, 1), clamp(p.y, 0, 1));
+            }
+            scheduleLightRefresh();
+        });
+
+        const endEditorDrag = (e) => {
+            if (!editorDrag) return;
+            editorDrag = null;
+            if (e && e.pointerId !== undefined && editorCanvas.hasPointerCapture(e.pointerId)) {
+                editorCanvas.releasePointerCapture(e.pointerId);
+            }
+            if (editorRaf) { cancelAnimationFrame(editorRaf); editorRaf = 0; }
+            refreshAll();
+        };
+        editorCanvas.addEventListener('pointerup', endEditorDrag);
+        editorCanvas.addEventListener('pointercancel', endEditorDrag);
 
         /**
          * 匯出高解析度、1:1 精準實體尺寸 PDF (使用 jsPDF)
@@ -1247,8 +1454,9 @@
                     const img = new Image();
                     img.onload = () => {
                         state.sourceImage = img;
+                        state.box = { x: 0.36, y: 0.36, w: 0.28, h: 0.28 };
                         refreshAll();
-                        showToast('圖片已套用並完成逆透視投影變形！', 'success');
+                        showToast('圖片已套用！請拖曳藍框對準消失點位置。', 'success');
                     };
                     img.src = e.target.result;
                 };
@@ -1279,9 +1487,7 @@
             // 載入內建走廊範例按鈕
             document.getElementById('btn-load-demo').addEventListener('click', () => {
                 state.sourceImage = createDemoCorridorImage();
-                state.vanishingRatio = 0.28;
-                document.getElementById('vanishing-ratio').value = 28;
-                document.getElementById('vanishing-ratio-val').textContent = '28%';
+                state.box = { x: 0.36, y: 0.36, w: 0.28, h: 0.28 };
                 refreshAll();
                 showToast('已重新載入經典單點透視走廊範例', 'info');
             });
@@ -1290,10 +1496,35 @@
             const ratioSlider = document.getElementById('vanishing-ratio');
             const ratioVal = document.getElementById('vanishing-ratio-val');
             ratioSlider.addEventListener('input', (e) => {
-                const v = parseInt(e.target.value, 10);
-                state.vanishingRatio = v / 100;
-                ratioVal.textContent = `${v}%`;
+                const v = parseInt(e.target.value, 10) / 100;
+                const b = state.box;
+                const aspect = b.h / b.w;
+                // 以方框中心為基準縮放，並限制在原圖範圍內
+                const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+                let w = v, h = state.lockSquare ? v : v * aspect;
+                const maxHalfW = Math.min(cx, 1 - cx), maxHalfH = Math.min(cy, 1 - cy);
+                const f = Math.min(1, (maxHalfW * 2) / w, (maxHalfH * 2) / h);
+                w *= f; h *= f;
+                state.box = { x: cx - w / 2, y: cy - h / 2, w, h };
                 refreshAll();
+            });
+
+            document.getElementById('opt-lock-square').addEventListener('change', (e) => {
+                state.lockSquare = e.target.checked;
+                if (state.lockSquare) {
+                    const b = state.box;
+                    const size = Math.min(b.w, b.h);
+                    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+                    const half = Math.min(size / 2, cx, 1 - cx, cy, 1 - cy);
+                    state.box = { x: cx - half, y: cy - half, w: half * 2, h: half * 2 };
+                }
+                refreshAll();
+            });
+
+            document.getElementById('btn-reset-box').addEventListener('click', () => {
+                state.box = { x: 0.36, y: 0.36, w: 0.28, h: 0.28 };
+                refreshAll();
+                showToast('已重設中央方框', 'info');
             });
 
             // 4. 實體尺寸輸入框
@@ -1415,7 +1646,9 @@
                     pageStyle.id = 'dynamic-page-style';
                     document.head.appendChild(pageStyle);
                 }
-                pageStyle.textContent = `@media print { @page { size: ${state.paperSize.toLowerCase()} portrait; margin: 0; } }`;
+                const pp = PAPER_SPECS[state.paperSize];
+                pageStyle.textContent = `@media print { @page { size: ${state.paperSize.toLowerCase()} portrait; margin: 0; } #print-area { width: ${pp.widthCm * 10}mm !important; height: ${pp.heightCm * 10}mm !important; display: block !important; } #print-canvas { width: ${pp.widthCm * 10}mm !important; height: ${pp.heightCm * 10}mm !important; display: block; } }`;
+                renderPrintSheet(printCanvas, 300);
                 window.print();
             });
         });
