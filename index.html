@@ -210,7 +210,7 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">斜面斜高</label>
                         <div class="relative">
-                            <input type="number" id="dim-slant" value="7.5" step="0.1" min="2.0" max="15.0" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:outline-none">
+                            <input type="number" id="dim-slant" value="7.0" step="0.1" min="2.0" max="15.0" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:outline-none">
                             <span class="absolute right-2.5 top-2 text-xs text-slate-400">cm</span>
                         </div>
                     </div>
@@ -229,6 +229,39 @@
                     <p id="geometry-warning" class="text-amber-600 font-medium hidden pt-1">
                         ⚠️ 注意：斜面斜高需大於 (大外框 - 小底邊) ÷ 2 才能立體折起，已自動為您計算展開斜高。
                     </p>
+                </div>
+
+                <!-- 紙框架參數 -->
+                <div class="pt-2 border-t border-slate-100 space-y-2">
+                    <label class="flex items-center space-x-2 text-xs font-medium text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox" id="opt-frame" checked class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                        <span>同頁列印紙框架展開圖（白色，單面列印）</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">框寬 (正面)</label>
+                            <div class="relative">
+                                <input type="number" id="dim-frame-t" value="1.0" step="0.1" min="0.3" max="3.0" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:outline-none">
+                                <span class="absolute right-2.5 top-2 text-xs text-slate-400">cm</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">框深 (側壁)</label>
+                            <div class="relative">
+                                <input type="number" id="dim-frame-d" value="0.8" step="0.1" min="0.4" max="3.0" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:outline-none">
+                                <span class="absolute right-2.5 top-2 text-xs text-slate-400">cm</span>
+                            </div>
+                        </div>
+                    </div>
+                    <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox" id="opt-frame-attach" checked class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                        <span>框條直接接在透視圖四周（寬度不足時自動分開排列）</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox" id="opt-wood" checked class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                        <span>紙框架套用木紋（固定圖樣，每次列印一致）</span>
+                    </label>
+                    <p id="frame-fit-warning" class="text-amber-600 text-xs font-medium hidden"></p>
                 </div>
 
                 <!-- 紙張格式與輔助線選項 -->
@@ -279,6 +312,7 @@
                     <li>沿著<strong class="text-slate-800">最外圍輪廓（含左右虛線梯形黏貼邊）</strong>剪下。</li>
                     <li>在中央小正方形四邊與四條斜邊輕劃壓痕，將四個梯形<strong class="text-slate-800">向背面（圖片朝外）</strong>折起。</li>
                     <li>將左右四個虛線黏貼邊塗膠黏合於上下梯形內側，形成<strong class="text-slate-800">圖片朝外的截頭四角錐</strong>。</li>
+                    <li>紙框架：沿<strong class="text-slate-800">點線</strong>先摺框面與側壁（側壁向背面），梯形外緣也是摺線；左右側壁的虛線黏貼邊黏在上下側壁內側，完成方框。</li>
                     <li>閉上一隻眼睛並微微左右移動頭部，原本凸出的紙盒會產生神奇的「深邃凹陷空間」錯覺！</li>
                 </ol>
             </section>
@@ -358,9 +392,14 @@
             vanishingRatio: 0.28,    // 原圖中央遠景方塊比例（與 box.w 同步）
             box: { x: 0.36, y: 0.36, w: 0.28, h: 0.28 }, // 中央方框 (0~1 正規化座標，可拖曳/縮放)
             lockSquare: true,        // 方框鎖定為正方形
+            frameT: 1.0,             // 紙框架正面框寬 (cm)
+            frameD: 0.8,             // 紙框架側壁深度 (cm)
+            showFrame: true,         // 同頁列印紙框架展開圖
+            showWood: true,          // 紙框架套用固定木紋
+            frameAttached: true,     // 框條直接接在透視圖四周 (放不下時自動分開排列)
             innerCm: 2.8,            // 截頭四角錐小底邊 (cm)
             outerCm: 13.8,           // 截頭四角錐大外框 (cm)
-            slantCm: 7.5,            // 梯形斜面斜高 (cm) - 注意：幾何上斜高需 > (outer - inner)/2
+            slantCm: 7.0,            // 梯形斜面斜高 (cm) - 注意：幾何上斜高需 > (outer - inner)/2
             paperSize: 'A4',         // 'A4' (210x297mm) 或 'Letter' (215.9x279.4mm)
             showCutLines: true,      // 顯示實線裁切/摺疊線
             showTabs: true,          // 顯示左右虛線黏貼邊
@@ -556,6 +595,99 @@
         /**
          * 將任意上傳圖片裁切為置中正方形高解析度畫布 (1200x1200)
          */
+        /**
+         * 固定種子木紋 (每次產生結果完全相同)
+         */
+        let _woodCache = null;
+        function getWoodCanvas() {
+            if (_woodCache) return _woodCache;
+            let seed = 20261125;
+            const rng = () => {
+                seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+                let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+            const W = 2400, H = 1400;
+            const c = document.createElement('canvas');
+            c.width = W; c.height = H;
+            const g = c.getContext('2d');
+
+            // 底色：淺橡木，縱向帶有緩慢明暗變化
+            const grad = g.createLinearGradient(0, 0, 0, H);
+            grad.addColorStop(0, '#d2b48a');
+            grad.addColorStop(0.5, '#c4a276');
+            grad.addColorStop(1, '#cdae82');
+            g.fillStyle = grad;
+            g.fillRect(0, 0, W, H);
+
+            // 寬幅年輪帶
+            for (let i = 0; i < 70; i++) {
+                const y0 = rng() * H, th = 8 + rng() * 40;
+                const amp = 2 + rng() * 10, fr = 0.0008 + rng() * 0.0016, ph = rng() * 6.28;
+                g.fillStyle = rng() < 0.5 ? 'rgba(120,80,40,0.06)' : 'rgba(255,235,200,0.07)';
+                g.beginPath();
+                for (let x = 0; x <= W; x += 30) {
+                    const y = y0 + Math.sin(x * fr + ph) * amp;
+                    x === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+                }
+                for (let x = W; x >= 0; x -= 30) {
+                    const y = y0 + th + Math.sin(x * fr + ph) * amp;
+                    g.lineTo(x, y);
+                }
+                g.closePath(); g.fill();
+            }
+
+            // 細木紋線
+            for (let i = 0; i < 520; i++) {
+                const y0 = rng() * H;
+                const amp = 1 + rng() * 7, fr = 0.001 + rng() * 0.003, ph = rng() * 6.28;
+                const x0 = rng() * W * 0.4, x1 = x0 + W * (0.4 + rng() * 0.6);
+                g.strokeStyle = rng() < 0.7
+                    ? `rgba(90,55,25,${0.05 + rng() * 0.16})`
+                    : `rgba(255,240,215,${0.05 + rng() * 0.10})`;
+                g.lineWidth = 0.6 + rng() * 2.2;
+                g.beginPath();
+                for (let x = x0; x <= x1; x += 24) {
+                    const y = y0 + Math.sin(x * fr + ph) * amp + Math.sin(x * fr * 3.1 + ph * 2) * amp * 0.25;
+                    x === x0 ? g.moveTo(x, y) : g.lineTo(x, y);
+                }
+                g.stroke();
+            }
+
+            // 幾個固定位置的木節 (同心橢圓)
+            [[420, 300], [1500, 760], [2050, 1150], [900, 1050]].forEach(([kx, ky]) => {
+                for (let r = 5; r < 38; r += 4) {
+                    g.strokeStyle = `rgba(95,58,28,${0.22 - r * 0.004})`;
+                    g.lineWidth = 1.2;
+                    g.beginPath();
+                    g.ellipse(kx, ky, r * 2.4, r * 0.7, 0, 0, Math.PI * 2);
+                    g.stroke();
+                }
+                g.fillStyle = 'rgba(80,45,20,0.28)';
+                g.beginPath(); g.ellipse(kx, ky, 9, 3.5, 0, 0, Math.PI * 2); g.fill();
+            });
+
+            _woodCache = c;
+            return c;
+        }
+
+        /**
+         * 把木紋貼到指定多邊形 (clipPts, 像素座標)，m 為木紋矩形的 2D 轉換 (x 沿紋理方向)
+         */
+        function paintWood(ctx, clipPts, m, wCm, hCm, pxPerCm, idx) {
+            const wood = getWoodCanvas();
+            const sh = Math.min(wood.height / 4, wood.width * hCm / wCm);
+            ctx.save();
+            ctx.beginPath();
+            clipPts.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+            ctx.closePath();
+            ctx.clip();
+            ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+            ctx.drawImage(wood, 0, idx * sh, wood.width, sh, 0, 0, wCm * pxPerCm, hCm * pxPerCm);
+            ctx.restore();
+        }
+
         const _squareCache = new WeakMap();
         function getSquareSourceCanvas(img) {
             if (_squareCache.has(img)) return _squareCache.get(img);
@@ -830,7 +962,17 @@
 
             // 紙張中心點 (稍微上移 0.6cm 留空間給底部校準尺與說明)
             const centerX = targetCanvas.width / 2;
-            const centerY = targetCanvas.height / 2 - 0.5 * pxPerCm;
+            const netExt = Math.max(state.innerCm / 2 + geo.L, geo.b / 2); // 展開圖垂直半幅 (cm)
+            const E = state.innerCm / 2 + geo.L;                           // 梯形大底邊到中心的距離 (cm)
+            const fullHalf = E + state.frameT + state.frameD;              // 含框條的半幅
+            const attachFitW = 2 * fullHalf <= paper.widthCm - 0.6 + 1e-6; // 容許浮點誤差
+            const attachFitH = 0.6 + 2 * fullHalf + 0.4 <= paper.heightCm - 1.8;
+            const attached = state.showFrame && state.frameAttached && attachFitW && attachFitH;
+            const separate = state.showFrame && !attached;
+            const topMargin = attached ? 0.6 : 0.5;
+            const centerY = attached
+                ? (0.6 + fullHalf) * pxPerCm
+                : (separate ? (topMargin + netExt) * pxPerCm : targetCanvas.height / 2 - 0.5 * pxPerCm);
 
             // 將 cm 座標轉換為畫布像素座標的輔助函式
             const toPx = (pt) => ({
@@ -932,26 +1074,231 @@
                 ctx.lineJoin = 'round';
                 ctx.setLineDash([]);
 
-                const strokePoly = (pts) => {
-                    ctx.beginPath();
-                    ctx.moveTo(pts[0].x, pts[0].y);
-                    for (let i = 1; i < pts.length; i++) {
-                        ctx.lineTo(pts[i].x, pts[i].y);
-                    }
-                    ctx.closePath();
-                    ctx.stroke();
+                const edge = (pts, i) => {
+                    const p = pts[i], q = pts[(i + 1) % pts.length];
+                    ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
                 };
-
-                strokePoly(dstCenter);
-                strokePoly(dstTop);
-                strokePoly(dstBottom);
-                strokePoly(dstLeft);
-                strokePoly(dstRight);
+                // 實線：外圍裁切線
+                ctx.beginPath();
+                // 接框條時，梯形大底邊變成摺線，不畫實線
+                (attached ? [1, 3] : [0, 1, 3]).forEach(i => edge(dstTop, i));
+                (attached ? [1, 3] : [1, 2, 3]).forEach(i => edge(dstBottom, i));
+                (attached ? [0, 2] : [0, 2, 3]).forEach(i => edge(dstLeft, i));
+                (attached ? [0, 2] : [0, 1, 2]).forEach(i => edge(dstRight, i));
+                ctx.stroke();
+                // 點線：中央方塊四邊 = 摺線
+                ctx.save();
+                ctx.lineWidth = Math.max(2, dpi * 0.008);
+                ctx.setLineDash([dpi * 0.012, dpi * 0.03]);
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                [0, 1, 2, 3].forEach(i => edge(dstCenter, i));
+                ctx.stroke();
+                ctx.restore();
                 ctx.restore();
             }
 
+            // 4.4 框條直接接在四片梯形大底邊外側 (框面 + 側壁，連成一整張展開圖)
+            if (attached) {
+                const t = state.frameT, d = state.frameD;
+                const hb2 = geo.b / 2;
+                const tabW = 0.7;
+                const inset = Math.min(0.2, d * 0.25);
+                const lwA = Math.max(2.5, dpi * 0.01);
+                const sides = [
+                    { n: [0, -1], tabs: false },  // 上
+                    { n: [1, 0],  tabs: true },   // 右
+                    { n: [0, 1],  tabs: false },  // 下
+                    { n: [-1, 0], tabs: true }    // 左
+                ];
+                const poly = (pts) => {
+                    ctx.beginPath();
+                    pts.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+                    ctx.stroke();
+                };
+                ctx.save();
+                ctx.lineJoin = 'round';
+                sides.forEach((sd, si) => {
+                    const [nx, ny] = sd.n;
+                    const tx = -ny, ty = nx;
+                    const Q = (s, h) => toPx({ x: nx * h + tx * s, y: ny * h + ty * s });
+                    const A = Q(-hb2, E), B = Q(hb2, E);
+                    const C = Q(hb2 + t, E + t), D = Q(-hb2 - t, E + t);
+                    const C2 = Q(hb2 + t, E + t + d), D2 = Q(-hb2 - t, E + t + d);
+
+                    if (state.showWood) {
+                        const o = Q(-hb2 - t, E);
+                        paintWood(ctx, [A, B, C, C2, D2, D],
+                            { a: tx, b: ty, c: nx, d: ny, e: o.x, f: o.y },
+                            geo.b + 2 * t, t + d, pxPerCm, si);
+                    }
+
+                    if (state.showCutLines) {
+                        // 實線：框面斜邊、側壁外緣 (上下側壁兩端也是裁切線)
+                        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = lwA; ctx.setLineDash([]); ctx.lineCap = 'butt';
+                        poly([A, D]); poly([B, C]); poly([D2, C2]);
+                        if (!sd.tabs) { poly([D, D2]); poly([C, C2]); }
+                        // 點線：梯形外緣、框面/側壁交界 (左右側壁兩端為摺線)
+                        ctx.lineWidth = Math.max(2, dpi * 0.008);
+                        ctx.lineCap = 'round';
+                        ctx.setLineDash([dpi * 0.012, dpi * 0.03]);
+                        poly([A, B]); poly([D, C]);
+                        if (sd.tabs) { poly([D, D2]); poly([C, C2]); }
+                    }
+                    if (state.showTabs && sd.tabs) {
+                        ctx.strokeStyle = '#334155';
+                        ctx.lineWidth = Math.max(2, dpi * 0.008);
+                        ctx.lineCap = 'butt';
+                        ctx.setLineDash([dpi * 0.05, dpi * 0.04]);
+                        poly([C, Q(hb2 + t + tabW, E + t + inset), Q(hb2 + t + tabW, E + t + d - inset), C2]);
+                        poly([D, Q(-hb2 - t - tabW, E + t + inset), Q(-hb2 - t - tabW, E + t + d - inset), D2]);
+                    }
+                });
+                ctx.restore();
+            }
+
+            // 4.5 同頁繪製紙框架展開圖 (分開排列版：白色，四條框條 + 右側校準尺/圖例)
+            const fitWarn = document.getElementById('frame-fit-warning');
+            if (separate) {
+                const t = state.frameT, d = state.frameD;
+                const F = geo.b + 2 * t;
+                const tabW = 0.7, rowGap = 0.25;
+                const x0 = 0.7, ox = x0 + tabW;
+                const startY = topMargin + 2 * netExt + 0.45;
+                const needH = startY + 4 * (t + d) + 3 * rowGap;
+                const needW = x0 + F + 2 * tabW + 0.3 + 2.6;
+                const msgs = [];
+                if (state.frameAttached) {
+                    msgs.push(`⚠️ 接在四周需約 ${(2 * fullHalf).toFixed(1)} cm 寬，超出 ${paper.label.split(' ')[0]} 紙張，已改為分開排列（可縮小框面/側壁或斜高）。`);
+                }
+                if (needH > paper.heightCm - 0.3 || needW > paper.widthCm) {
+                    msgs.push(`⚠️ 分開排列版面也超出紙張範圍（需約 ${needW.toFixed(1)}×${needH.toFixed(1)} cm）。`);
+                }
+                if (msgs.length) {
+                    fitWarn.textContent = msgs.join(' ');
+                    fitWarn.classList.remove('hidden');
+                } else {
+                    fitWarn.classList.add('hidden');
+                }
+
+                const P = (x, y) => ({ x: x * pxPerCm, y: y * pxPerCm });
+                const lw = Math.max(2.5, dpi * 0.01);
+                const pieces = [
+                    { name: '上框', tabs: false }, { name: '下框', tabs: false },
+                    { name: '左框', tabs: true },  { name: '右框', tabs: true }
+                ];
+                const line = (pts) => {
+                    ctx.beginPath();
+                    pts.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+                    ctx.stroke();
+                };
+                pieces.forEach((pc, idx) => {
+                    const y = startY + idx * (t + d + rowGap);
+                    const yb = y + t, ye = y + t + d;
+                    ctx.save();
+                    ctx.lineJoin = 'round';
+                    ctx.fillStyle = '#ffffff';
+                    // 白色底 (框條外形)
+                    ctx.beginPath();
+                    [P(ox, yb), P(ox + t, y), P(ox + F - t, y), P(ox + F, yb), P(ox + F, ye), P(ox, ye)]
+                        .forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+                    ctx.closePath(); ctx.fill();
+                    if (state.showWood) {
+                        paintWood(ctx,
+                            [P(ox, yb), P(ox + t, y), P(ox + F - t, y), P(ox + F, yb), P(ox + F, ye), P(ox, ye)],
+                            { a: 1, b: 0, c: 0, d: 1, e: ox * pxPerCm, f: y * pxPerCm },
+                            F, t + d, pxPerCm, idx);
+                    }
+
+                    // 實線：裁切線
+                    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = lw; ctx.setLineDash([]);
+                    if (!pc.tabs) {
+                        ctx.beginPath();
+                        [P(ox, yb), P(ox + t, y), P(ox + F - t, y), P(ox + F, yb), P(ox + F, ye), P(ox, ye)]
+                            .forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+                        ctx.closePath(); ctx.stroke();
+                    } else {
+                        line([P(ox, yb), P(ox + t, y), P(ox + F - t, y), P(ox + F, yb)]);
+                        line([P(ox + F, ye), P(ox, ye)]);
+                    }
+
+                    // 點線：摺線 (框面/側壁交界；左右條另含側壁兩端)
+                    ctx.lineWidth = Math.max(2, dpi * 0.008);
+                    ctx.lineCap = 'round';
+                    ctx.setLineDash([dpi * 0.012, dpi * 0.03]);
+                    line([P(ox, yb), P(ox + F, yb)]);
+                    if (pc.tabs) {
+                        line([P(ox, yb), P(ox, ye)]);
+                        line([P(ox + F, yb), P(ox + F, ye)]);
+                    }
+
+                    // 虛線：黏貼邊 (僅左右框條)
+                    if (pc.tabs) {
+                        ctx.lineCap = 'butt';
+                        ctx.setLineDash([dpi * 0.05, dpi * 0.04]);
+                        line([P(ox, yb), P(ox - tabW, yb + 0.25), P(ox - tabW, ye - 0.25), P(ox, ye)]);
+                        line([P(ox + F, yb), P(ox + F + tabW, yb + 0.25), P(ox + F + tabW, ye - 0.25), P(ox + F, ye)]);
+                    }
+
+                    // 標籤文字
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = state.showWood ? '#4b3320' : '#94a3b8';
+                    ctx.font = `500 ${Math.round(dpi * 0.075)}px "Noto Sans TC", Inter, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${pc.name}（框面 ${t.toFixed(1)}｜側壁 ${d.toFixed(1)}）`, (ox + F / 2) * pxPerCm, (yb + d / 2 + 0.1) * pxPerCm);
+                    ctx.restore();
+                });
+
+                // 右側欄：垂直 5cm 校準尺 + 圖例 + 尺寸摘要
+                const colX = x0 + F + 2 * tabW + 0.3;
+                let cy = startY;
+                ctx.save();
+                ctx.strokeStyle = '#334155'; ctx.fillStyle = '#334155';
+                ctx.lineWidth = Math.max(2, dpi * 0.008);
+                ctx.textAlign = 'left';
+                const fs = Math.round(dpi * 0.075);
+                ctx.font = `600 ${fs}px Inter, "Noto Sans TC", sans-serif`;
+                if (state.showRuler) {
+                    const rx = colX + 0.3;
+                    line([P(rx, cy), P(rx, cy + 5)]);
+                    for (let mm = 0; mm <= 50; mm += 5) {
+                        const ty = cy + mm / 10;
+                        const tl = (mm % 10 === 0) ? 0.28 : 0.16;
+                        line([P(rx, ty), P(rx + tl, ty)]);
+                        if (mm % 10 === 0 && mm > 0) ctx.fillText(`${mm / 10}`, (rx + 0.34) * pxPerCm, (ty + 0.07) * pxPerCm);
+                    }
+                    ctx.fillText('cm', (rx + 0.34) * pxPerCm, (cy + 0.1) * pxPerCm);
+                    ctx.fillStyle = '#64748b';
+                    ctx.fillText('100% 列印', (colX + 0.1) * pxPerCm, (cy + 5.45) * pxPerCm);
+                    cy += 5.9;
+                }
+                // 圖例
+                ctx.font = `500 ${fs}px "Noto Sans TC", Inter, sans-serif`;
+                const legend = [
+                    { label: '裁切線', dash: [] },
+                    { label: '摺線', dash: [dpi * 0.012, dpi * 0.03] },
+                    { label: '黏貼邊', dash: [dpi * 0.05, dpi * 0.04] }
+                ];
+                legend.forEach((lg) => {
+                    ctx.strokeStyle = '#0f172a'; ctx.setLineDash(lg.dash); ctx.lineCap = lg.dash.length === 2 && lg.dash[0] < 10 ? 'round' : 'butt';
+                    line([P(colX + 0.1, cy), P(colX + 0.8, cy)]);
+                    ctx.setLineDash([]); ctx.fillStyle = '#334155';
+                    ctx.fillText(lg.label, (colX + 0.95) * pxPerCm, (cy + 0.08) * pxPerCm);
+                    cy += 0.42;
+                });
+                cy += 0.15;
+                ctx.fillStyle = '#64748b';
+                [`小底邊 ${geo.a.toFixed(1)}cm`, `大外框 ${geo.b.toFixed(1)}cm`, `斜高 ${geo.L.toFixed(1)}cm`].forEach(s => {
+                    ctx.fillText(s, (colX + 0.1) * pxPerCm, (cy + 0.08) * pxPerCm);
+                    cy += 0.38;
+                });
+                ctx.restore();
+            } else {
+                fitWarn.classList.add('hidden');
+            }
+
             // 5. 繪製底部 5cm 實體校準尺與尺寸標註
-            if (state.showRuler) {
+            if (state.showRuler && !separate) {
                 ctx.save();
                 const rulerY = targetCanvas.height - 1.3 * pxPerCm;
                 const rulerW = 5 * pxPerCm;
@@ -989,6 +1336,31 @@
                 ctx.textAlign = 'center';
                 const infoStr = `逆透視截頭四角錐展開圖 ｜ 小底邊: ${geo.a.toFixed(1)}cm · 大外框: ${geo.b.toFixed(1)}cm · 斜高: ${geo.L.toFixed(1)}cm ｜ 請以 100% 實際大小列印`;
                 ctx.fillText(infoStr, targetCanvas.width / 2, rulerY - 0.55 * pxPerCm);
+                ctx.restore();
+            }
+
+            // 6. 底部圖例 (裁切線 / 摺線 / 黏貼邊)
+            if (!separate && (state.showCutLines || state.showTabs)) {
+                ctx.save();
+                const fsL = Math.round(dpi * 0.075);
+                ctx.font = `500 ${fsL}px "Noto Sans TC", Inter, sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.strokeStyle = '#0f172a';
+                ctx.fillStyle = '#334155';
+                ctx.lineWidth = Math.max(2, dpi * 0.008);
+                const ly = targetCanvas.height - 0.5 * pxPerCm;
+                let lx = 0.9 * pxPerCm;
+                [['裁切線', []], ['摺線', [dpi * 0.012, dpi * 0.03]], ['黏貼邊', [dpi * 0.05, dpi * 0.04]]].forEach(([label, dash]) => {
+                    ctx.setLineDash(dash);
+                    ctx.lineCap = label === '摺線' ? 'round' : 'butt';
+                    ctx.beginPath();
+                    ctx.moveTo(lx, ly - 0.06 * pxPerCm);
+                    ctx.lineTo(lx + 0.7 * pxPerCm, ly - 0.06 * pxPerCm);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillText(label, lx + 0.85 * pxPerCm, ly);
+                    lx += 2.3 * pxPerCm;
+                });
                 ctx.restore();
             }
         }
@@ -1153,8 +1525,8 @@
             const pyramid = new THREE.Mesh(bufferGeo, mat);
 
             // 加上木質外框底座 (呼應參考圖 61109.jpg 實體質感)
-            const frameThickness = 0.8;
-            const frameDepth = 1.2;
+            const frameThickness = state.frameT;
+            const frameDepth = state.frameD;
             const frameShape = new THREE.Shape();
             const fo = hb + frameThickness;
             frameShape.moveTo(-fo, -fo);
@@ -1179,11 +1551,16 @@
                 bevelSize: 0.08,
                 bevelThickness: 0.08
             });
-            const frameMat = new THREE.MeshStandardMaterial({
-                color: 0xc8a986,
-                roughness: 0.65,
-                metalness: 0.05
-            });
+            let frameMat;
+            if (state.showWood) {
+                const woodTex = new THREE.CanvasTexture(getWoodCanvas());
+                woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+                woodTex.repeat.set(0.05, 0.07);
+                woodTex.anisotropy = 8;
+                frameMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0xffffff, roughness: 0.65, metalness: 0.05 });
+            } else {
+                frameMat = new THREE.MeshStandardMaterial({ color: 0xc8a986, roughness: 0.65, metalness: 0.05 });
+            }
             const frameMesh = new THREE.Mesh(frameGeo, frameMat);
             frameMesh.position.z = zBack - frameDepth;
 
@@ -1535,26 +1912,45 @@
             const onDimChange = () => {
                 const a = parseFloat(dimInner.value) || 2.8;
                 const b = parseFloat(dimOuter.value) || 13.8;
-                const s = parseFloat(dimSlant.value) || 7.5;
+                const s = parseFloat(dimSlant.value) || 7.0;
                 state.innerCm = Math.max(0.5, Math.min(a, b - 1.0));
                 state.outerCm = Math.max(state.innerCm + 1.0, b);
                 state.slantCm = Math.max(1.0, s);
+                state.frameT = Math.max(0.3, Math.min(3, parseFloat(document.getElementById('dim-frame-t').value) || 1.0));
+                state.frameD = Math.max(0.4, Math.min(3, parseFloat(document.getElementById('dim-frame-d').value) || 0.8));
                 refreshAll();
             };
 
             dimInner.addEventListener('change', onDimChange);
             dimOuter.addEventListener('change', onDimChange);
             dimSlant.addEventListener('change', onDimChange);
+            document.getElementById('dim-frame-t').addEventListener('change', onDimChange);
+            document.getElementById('dim-frame-d').addEventListener('change', onDimChange);
+            document.getElementById('opt-wood').addEventListener('change', (e) => {
+                state.showWood = e.target.checked;
+                refreshAll();
+            });
+            document.getElementById('opt-frame-attach').addEventListener('change', (e) => {
+                state.frameAttached = e.target.checked;
+                refreshAll();
+            });
+            document.getElementById('opt-frame').addEventListener('change', (e) => {
+                state.showFrame = e.target.checked;
+                refreshAll();
+            });
 
             document.getElementById('btn-reset-dims').addEventListener('click', () => {
                 state.innerCm = 2.8;
                 state.outerCm = 13.8;
-                state.slantCm = 7.5;
+                state.slantCm = 7.0;
                 dimInner.value = '2.8';
                 dimOuter.value = '13.8';
-                dimSlant.value = '7.5';
+                dimSlant.value = '7.0';
+                state.frameT = 1.0; state.frameD = 0.8;
+                document.getElementById('dim-frame-t').value = '1.0';
+                document.getElementById('dim-frame-d').value = '0.8';
                 refreshAll();
-                showToast('已恢復預設實體尺寸 (2.8cm / 13.8cm / 7.5cm)', 'info');
+                showToast('已恢復預設實體尺寸 (2.8cm / 13.8cm / 7.0cm)', 'info');
             });
 
             // 5. 紙張規格切換 (A4 / Letter)
